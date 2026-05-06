@@ -1,0 +1,66 @@
+[project]
+name = "llm-bedrock"
+version = "0.1.0"
+description = "LLM plugin for Amazon Bedrock - access all Converse API models"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "Apache-2.0"}
+keywords = ["llm", "bedrock", "aws", "ai", "cli"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "llm>=0.27.1",
+    "boto3>=1.34.162",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/llm-bedrock"
+Documentation = "https://github.com/yourusername/llm-bedrock#readme"
+Repository = "https://github.com/yourusername/llm-bedrock"
+Issues = "https://github.com/yourusername/llm-bedrock/issues"
+
+[project.entry-points.llm]
+bedrock = "llm_bedrock"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py38", "py39", "py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I", "N", "UP"]
+ignore = ["E501"]
