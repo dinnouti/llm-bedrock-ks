@@ -502,7 +502,7 @@ def register_commands(cli):
         if not cached_models:
             click.echo("No cached models. Run 'llm bedrock-ks refresh' first.")
             return
-        for m in cached_models:
+        for m in sorted(cached_models, key=lambda x: x.get("model_id", "")):
             provider = m.get("provider", "Unknown")
             name = m.get("name", m["model_id"])
             click.echo(f"  bedrock-ks/{m['model_id']} ({provider}: {name})")
