@@ -62,14 +62,18 @@ def test_document_format_mapping():
 
 def test_build_content_blocks_text_only():
     """Test building content blocks with text only."""
-    import llm
-
     model = BedrockModel(
         model_id="bedrock/test",
         bedrock_model_id="test-model-v1:0",
     )
 
-    prompt = llm.Prompt("Hello world")
+    # Create a mock prompt object
+    class MockPrompt:
+        def __init__(self, text):
+            self.prompt = text
+            self.attachments = []
+
+    prompt = MockPrompt("Hello world")
     content = model.build_content_blocks(prompt)
 
     assert len(content) == 1

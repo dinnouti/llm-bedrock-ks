@@ -91,6 +91,7 @@ def simplify_model_id(bedrock_model_id: str) -> str:
     # Remove date stamps (YYYYMMDD or YYYY-MM-DD patterns)
     name = re.sub(r"-\d{8}", "", name)  # Remove -20240229
     name = re.sub(r"-\d{4}-\d{2}-\d{2}", "", name)  # Remove -2024-02-29
+    name = re.sub(r"-\d{4}", "", name)  # Remove -2407 (year-only patterns)
 
     return name
 
@@ -571,7 +572,4 @@ def register_models(register, model_aliases):
             input_modalities=model_info.get("input_modalities", ["TEXT"]),
             output_modalities=model_info.get("output_modalities", ["TEXT"]),
         )
-        register(model)
-
-        # Also register with full Bedrock ID as alias
-        model_aliases[f"bedrock/{model_info['bedrock_id']}"] = model.model_id
+        register(model, aliases=(f"bedrock/{model_info['bedrock_id']}",))
