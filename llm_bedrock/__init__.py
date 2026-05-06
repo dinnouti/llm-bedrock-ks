@@ -458,7 +458,7 @@ def register_models(register):
         logger.warning("no_models_found", reason="discovery_failed_and_no_cache")
         return
 
-    for model_info in models:
+    for model_info in sorted(models, key=lambda x: x.get("model_id", "")):
         register(BedrockModel(
             model_id=f"bedrock-ks/{model_info['model_id']}",
             bedrock_model_id=model_info["model_id"],

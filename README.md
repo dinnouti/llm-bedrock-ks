@@ -20,8 +20,8 @@ cd llm-bedrock-ks
 # Install in editable mode
 llm install -e .
 
-# Verify installation
-llm models list | grep bedrock-ks/
+# Verify installation (no credentials needed)
+llm plugins | grep bedrock-ks
 ```
 
 ## Setup
@@ -71,16 +71,19 @@ llm models list | grep bedrock-ks/
 # List available models
 llm models list | grep bedrock-ks/
 
+# Set a default model
+llm models default bedrock-ks/amazon.nova-micro-v1:0
+
 # Basic prompt
-llm -m bedrock-ks/amazon.nova-micro-v1:0 "Hello, world!"
+llm "Hello, world!"
 
 # Simple question
-llm -m bedrock-ks/amazon.nova-lite-v1:0 "What is Python?"
+llm "What is Python?"
 ```
 
 ### More Examples
 
-**Streaming (default):**
+**Use `-m` to override the default model for a single command:**
 ```bash
 llm -m bedrock-ks/amazon.nova-pro-v1:0 "Write a story about AI"
 ```
