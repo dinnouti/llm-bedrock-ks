@@ -63,3 +63,111 @@ class TestRetryLogic:
         assert result == []
         # Only 1 attempt (no retries for non-throttle errors)
         assert mock_client.list_inference_profiles.call_count == 1
+
+
+class TestDiscoveryFallback:
+    """Test that models without inference profiles are still discovered."""
+
+    def test_foundation_model_without_profile(self):
+        """Models with no inference profile are included via foundation model fallback."""
+        mock_client = Mock()
+        mock_client.list_foundation_models.return_value = {
+            "modelSummaries": [
+                {
+                    "modelId": "qwen.qwen3-32b-v1:0",
+                    "modelArn": "arn:aws:bedrock:us-east-1::foundation-model/qwen.qwen3-32b-v1:0",
+                    "modelName": "Qwen3 32B",
+                    "providerName": "Qwen",
+                    "inputModalities": ["TEXT"],
+                    "outputModalities": ["TEXT"],
+                    "responseStreamingSupported": True,
+                    "inferenceTypesSupported": ["ON_DEMAND"],
+                    "modelLifecycle": {"status": "ACTIVE"},
+                },
+            ]
+        }
+        mock_client.list_inference_profiles.return_value = {"inferenceProfileSummaries": []}
+
+        with patch("llm_bedrock.boto3.client", return_value=mock_client):
+            from llm_bedrock import discover_bedrock_models
+            result = discover_bedrock_models("us-east-1")
+
+        assert len(result) == 1
+        assert result[0]["model_id"] == "qwen.qwen3-32b-v1:0"
+        assert result[0]["name"] == "Qwen3 32B"
+        assert result[0]["streaming"] is True
+
+    def test_foundation_model_with_profile_not_duplicated(self):
+        """Models that have an inference profile are not added again from foundation models."""
+        model_arn = "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0"
+        mock_client = Mock()
+        mock_client.list_foundation_models.return_value = {
+            "modelSummaries": [
+                {
+                    "modelId": "anthropic.claude-3-sonnet-20240229-v1:0",
+                    "modelArn": model_arn,
+                    "modelName": "Claude 3 Sonnet",
+                    "providerName": "Anthropic",
+                    "inputModalities": ["TEXT", "IMAGE"],
+                    "outputModalities": ["TEXT"],
+                    "responseStreamingSupported": True,
+                    "inferenceTypesSupported": ["ON_DEMAND", "INFERENCE_PROFILE"],
+                    "modelLifecycle": {"status": "ACTIVE"},
+                },
+            ]
+        }
+        mock_client.list_inference_profiles.return_value = {
+            "inferenceProfileSummaries": [
+                {
+                    "inferenceProfileId": "us.anthropic.claude-3-sonnet-20240229-v1:0",
+                    "inferenceProfileName": "US Claude 3 Sonnet",
+                    "status": "ACTIVE",
+                    "models": [{"modelArn": model_arn}],
+                },
+            ]
+        }
+
+        with patch("llm_bedrock.boto3.client", return_value=mock_client):
+            from llm_bedrock import discover_bedrock_models
+            result = discover_bedrock_models("us-east-1")
+
+        assert len(result) == 1
+        assert result[0]["model_id"] == "us.anthropic.claude-3-sonnet-20240229-v1:0"
+
+    def test_provisioned_only_models_excluded(self):
+        """Context-window variants (PROVISIONED only) are excluded."""
+        mock_client = Mock()
+        mock_client.list_foundation_models.return_value = {
+            "modelSummaries": [
+                {
+                    "modelId": "amazon.nova-pro-v1:0:24k",
+                    "modelArn": "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-pro-v1:0:24k",
+                    "modelName": "Nova Pro",
+                    "providerName": "Amazon",
+                    "inputModalities": ["TEXT", "IMAGE", "VIDEO"],
+                    "outputModalities": ["TEXT"],
+                    "responseStreamingSupported": True,
+                    "inferenceTypesSupported": ["PROVISIONED"],
+                    "modelLifecycle": {"status": "ACTIVE"},
+                },
+                {
+                    "modelId": "qwen.qwen3-32b-v1:0",
+                    "modelArn": "arn:aws:bedrock:us-east-1::foundation-model/qwen.qwen3-32b-v1:0",
+                    "modelName": "Qwen3 32B",
+                    "providerName": "Qwen",
+                    "inputModalities": ["TEXT"],
+                    "outputModalities": ["TEXT"],
+                    "responseStreamingSupported": True,
+                    "inferenceTypesSupported": ["ON_DEMAND"],
+                    "modelLifecycle": {"status": "ACTIVE"},
+                },
+            ]
+        }
+        mock_client.list_inference_profiles.return_value = {"inferenceProfileSummaries": []}
+
+        with patch("llm_bedrock.boto3.client", return_value=mock_client):
+            from llm_bedrock import discover_bedrock_models
+            result = discover_bedrock_models("us-east-1")
+
+        assert len(result) == 1
+        assert result[0]["model_id"] == "qwen.qwen3-32b-v1:0"

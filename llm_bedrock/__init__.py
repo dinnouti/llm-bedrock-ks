@@ -158,7 +158,7 @@ class ModelCache:
 
 
 def discover_bedrock_models(region: str) -> list:
-    """Discover Bedrock models via inference profiles. Returns empty list on error."""
+    """Discover Bedrock models via inference profiles and foundation models. Returns empty list on error."""
     try:
         client = boto3.client("bedrock", region_name=region)
 
@@ -171,13 +171,15 @@ def discover_bedrock_models(region: str) -> list:
             return client.list_inference_profiles(**kwargs)
 
         fm_response = _list_foundation()
+        foundation_models = fm_response.get("modelSummaries", [])
         modality_lookup = {}
-        for summary in fm_response.get("modelSummaries", []):
+        for summary in foundation_models:
             modality_lookup[summary["modelArn"]] = {
                 "input_modalities": summary.get("inputModalities", ["TEXT"]),
                 "output_modalities": summary.get("outputModalities", ["TEXT"]),
             }
 
+        # Collect inference profiles
         profiles = []
         next_token = None
         while True:
@@ -190,6 +192,8 @@ def discover_bedrock_models(region: str) -> list:
             if not next_token:
                 break
 
+        # Track which foundation models are covered by a profile
+        profile_covered_arns = set()
         models = []
         for profile in profiles:
             if profile.get("status") != "ACTIVE":
@@ -198,6 +202,7 @@ def discover_bedrock_models(region: str) -> list:
             modalities = {"input_modalities": ["TEXT"], "output_modalities": ["TEXT"]}
             for model_ref in profile.get("models", []):
                 arn = model_ref.get("modelArn", "")
+                profile_covered_arns.add(arn)
                 if arn in modality_lookup:
                     modalities = modality_lookup[arn]
                     break
@@ -208,6 +213,31 @@ def discover_bedrock_models(region: str) -> list:
                 "streaming": True,
                 "input_modalities": modalities["input_modalities"],
                 "output_modalities": modalities["output_modalities"],
+            })
+
+        # Add foundation models that have no inference profile
+        for summary in foundation_models:
+            if summary["modelArn"] in profile_covered_arns:
+                continue
+
+            if "ON_DEMAND" not in summary.get("inferenceTypesSupported", []):
+                continue
+
+            input_modalities = summary.get("inputModalities", [])
+            output_modalities = summary.get("outputModalities", [])
+            if "TEXT" not in input_modalities or "TEXT" not in output_modalities:
+                continue
+
+            lifecycle = summary.get("modelLifecycle", {})
+            if lifecycle.get("status", "ACTIVE") != "ACTIVE":
+                continue
+
+            models.append({
+                "model_id": summary["modelId"],
+                "name": summary.get("modelName"),
+                "streaming": summary.get("responseStreamingSupported", False),
+                "input_modalities": input_modalities,
+                "output_modalities": output_modalities,
             })
 
         logger.info("models_discovered", count=len(models), region=region)
@@ -520,6 +550,4 @@ def register_commands(cli):
             click.echo("No cached models. Run 'llm bedrock-ks refresh' first.")
             return
         for m in sorted(cached_models, key=lambda x: x.get("model_id", "")):
-            provider = m.get("provider", "Unknown")
-            name = m.get("name", m["model_id"])
-            click.echo(f"  bedrock-ks/{m['model_id']} ({provider}: {name})")
+            click.echo(f"  bedrock-ks/{m['model_id']}")

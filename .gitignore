@@ -36,3 +36,6 @@ htmlcov/
 # AWS credentials
 *.pem
 credentials.json
+
+# API response dumps (contain account numbers)
+api_*.md
