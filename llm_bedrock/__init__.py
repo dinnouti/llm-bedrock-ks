@@ -157,40 +157,57 @@ class ModelCache:
             shutil.rmtree(self.cache_dir)
 
 
-def is_converse_compatible(model_summary: dict) -> bool:
-    """Check if model supports Converse API (text I/O and active status)."""
-    input_modalities = model_summary.get("inputModalities", [])
-    output_modalities = model_summary.get("outputModalities", [])
-    has_text_io = "TEXT" in input_modalities and "TEXT" in output_modalities
-
-    lifecycle = model_summary.get("modelLifecycle", {})
-    is_active = lifecycle.get("status", "ACTIVE") == "ACTIVE"
-
-    return has_text_io and is_active
-
-
 def discover_bedrock_models(region: str) -> list:
-    """Discover Bedrock models via API. Returns empty list on error."""
+    """Discover Bedrock models via inference profiles. Returns empty list on error."""
     try:
         client = boto3.client("bedrock", region_name=region)
 
         @with_retry(max_retries=MAX_RETRIES)
-        def _list_models():
+        def _list_foundation():
             return client.list_foundation_models()
 
-        response = _list_models()
-        models = []
-        for summary in response.get("modelSummaries", []):
-            if not is_converse_compatible(summary):
-                continue
-            model_id = summary["modelId"]
-            models.append({
-                "model_id": model_id,
-                "name": summary.get("modelName"),
-                "provider": summary.get("providerName"),
-                "streaming": summary.get("responseStreamingSupported", False),
+        @with_retry(max_retries=MAX_RETRIES)
+        def _list_profiles(**kwargs):
+            return client.list_inference_profiles(**kwargs)
+
+        fm_response = _list_foundation()
+        modality_lookup = {}
+        for summary in fm_response.get("modelSummaries", []):
+            modality_lookup[summary["modelArn"]] = {
                 "input_modalities": summary.get("inputModalities", ["TEXT"]),
                 "output_modalities": summary.get("outputModalities", ["TEXT"]),
+            }
+
+        profiles = []
+        next_token = None
+        while True:
+            kwargs = {"typeEquals": "SYSTEM_DEFINED", "maxResults": 1000}
+            if next_token:
+                kwargs["nextToken"] = next_token
+            response = _list_profiles(**kwargs)
+            profiles.extend(response.get("inferenceProfileSummaries", []))
+            next_token = response.get("nextToken")
+            if not next_token:
+                break
+
+        models = []
+        for profile in profiles:
+            if profile.get("status") != "ACTIVE":
+                continue
+
+            modalities = {"input_modalities": ["TEXT"], "output_modalities": ["TEXT"]}
+            for model_ref in profile.get("models", []):
+                arn = model_ref.get("modelArn", "")
+                if arn in modality_lookup:
+                    modalities = modality_lookup[arn]
+                    break
+
+            models.append({
+                "model_id": profile["inferenceProfileId"],
+                "name": profile.get("inferenceProfileName"),
+                "streaming": True,
+                "input_modalities": modalities["input_modalities"],
+                "output_modalities": modalities["output_modalities"],
             })
 
         logger.info("models_discovered", count=len(models), region=region)

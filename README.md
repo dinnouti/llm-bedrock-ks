@@ -72,7 +72,7 @@ llm models list | grep bedrock-ks/
 llm models list | grep bedrock-ks/
 
 # Set a default model
-llm models default bedrock-ks/amazon.nova-micro-v1:0
+llm models default bedrock-ks/us.amazon.nova-micro-v1:0
 
 # Basic prompt
 llm "Hello, world!"
@@ -85,35 +85,35 @@ llm "What is Python?"
 
 **Use `-m` to override the default model for a single command:**
 ```bash
-llm -m bedrock-ks/amazon.nova-pro-v1:0 "Write a story about AI"
+llm -m bedrock-ks/us.amazon.nova-pro-v1:0 "Write a story about AI"
 ```
 
 **Non-streaming:**
 ```bash
-llm -m bedrock-ks/amazon.nova-micro-v1:0 --no-stream "What is 2+2?"
+llm -m bedrock-ks/us.amazon.nova-micro-v1:0 --no-stream "What is 2+2?"
 ```
 
 **Custom options:**
 ```bash
 # More creative (higher temperature)
-llm -m bedrock-ks/amazon.nova-pro-v1:0 \
+llm -m bedrock-ks/us.amazon.nova-pro-v1:0 \
     -o temperature 0.9 \
     "Write a creative poem"
 
 # More focused (lower temperature)
-llm -m bedrock-ks/amazon.nova-micro-v1:0 \
+llm -m bedrock-ks/us.amazon.nova-micro-v1:0 \
     -o temperature 0.3 \
     "List the planets in order"
 
 # Limit output length
-llm -m bedrock-ks/amazon.nova-micro-v1:0 \
+llm -m bedrock-ks/us.amazon.nova-micro-v1:0 \
     -o max_tokens 100 \
     "Explain quantum computing"
 ```
 
 **System prompts:**
 ```bash
-llm -m bedrock-ks/amazon.nova-micro-v1:0 \
+llm -m bedrock-ks/us.amazon.nova-micro-v1:0 \
     --system "You are a helpful Python expert" \
     "Explain decorators"
 ```
@@ -121,12 +121,12 @@ llm -m bedrock-ks/amazon.nova-micro-v1:0 \
 **Images and documents:**
 ```bash
 # Analyze an image
-llm -m bedrock-ks/anthropic.claude-3-sonnet-20240229-v1:0 \
+llm -m bedrock-ks/us.anthropic.claude-3-sonnet-20240229-v1:0 \
     -a photo.jpg \
     "What's in this image?"
 
 # Process a PDF
-llm -m bedrock-ks/anthropic.claude-3-sonnet-20240229-v1:0 \
+llm -m bedrock-ks/us.anthropic.claude-3-sonnet-20240229-v1:0 \
     -a document.pdf \
     "Summarize this document"
 ```
@@ -134,15 +134,15 @@ llm -m bedrock-ks/anthropic.claude-3-sonnet-20240229-v1:0 \
 **Conversations:**
 ```bash
 # Start a conversation
-llm -m bedrock-ks/amazon.nova-micro-v1:0 "My name is Alice"
+llm -m bedrock-ks/us.amazon.nova-micro-v1:0 "My name is Alice"
 
 # Continue (remembers context)
-llm -m bedrock-ks/amazon.nova-micro-v1:0 --continue "What's my name?"
+llm -m bedrock-ks/us.amazon.nova-micro-v1:0 --continue "What's my name?"
 ```
 
 ## Available Models
 
-The plugin auto-discovers 70+ Converse API-compatible models from all providers:
+The plugin auto-discovers models via AWS inference profiles:
 
 - **Anthropic:** Claude 4.x, Claude 3.5 Sonnet, Claude 3 Opus/Sonnet/Haiku
 - **Amazon:** Nova Pro, Nova Lite, Nova Micro
@@ -157,7 +157,7 @@ The plugin auto-discovers 70+ Converse API-compatible models from all providers:
 - **Qwen:** Qwen models
 - **And more:** MiniMax, Moonshot AI, TwelveLabs, Writer, Z.AI
 
-> The plugin shows **all** models that support the Bedrock Converse API, regardless of provider.
+> The plugin registers all active system-defined inference profiles available in your region.
 
 Models are cached locally for 24 hours. To refresh:
 ```bash
@@ -196,7 +196,7 @@ Set a default model to avoid typing `-m` every time:
 
 ```bash
 # Set default model
-llm models default bedrock-ks/amazon.nova-micro-v1:0
+llm models default bedrock-ks/us.amazon.nova-micro-v1:0
 
 # Now you can use it without -m flag
 llm "Hello, world!"
@@ -212,9 +212,9 @@ Create shortcuts for frequently used models:
 
 ```bash
 # Create aliases
-llm aliases set nova bedrock-ks/amazon.nova-micro-v1:0
-llm aliases set nova-pro bedrock-ks/amazon.nova-pro-v1:0
-llm aliases set claude bedrock-ks/anthropic.claude-3-sonnet-20240229-v1:0
+llm aliases set nova bedrock-ks/us.amazon.nova-micro-v1:0
+llm aliases set nova-pro bedrock-ks/us.amazon.nova-pro-v1:0
+llm aliases set claude bedrock-ks/us.anthropic.claude-sonnet-4-6
 
 # Use aliases
 llm -m nova "Hello!"
@@ -259,9 +259,9 @@ STRUCTLOG_DEV=1 LOG_LEVEL=10 llm models list
 
 ### "ValidationException: Model not supported"
 
-Some models require inference profiles in certain regions. Try:
-- Different model (e.g., `amazon.nova-micro-v1:0` instead of `claude-sonnet-4`)
-- Different AWS region
+The plugin uses inference profile IDs (e.g., `us.amazon.nova-micro-v1:0`). If you see this error:
+- Run `llm bedrock-ks refresh` to update the model list
+- Ensure you're using the full profile ID shown by `llm models list`
 
 ### "ThrottlingException"
 

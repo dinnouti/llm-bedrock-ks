@@ -1,63 +1,22 @@
 """Unit tests for llm-bedrock-ks plugin."""
-from llm_bedrock import is_converse_compatible, BedrockModel
-
-
-def test_is_converse_compatible():
-    """Test Converse API compatibility detection."""
-    # Compatible models
-    assert is_converse_compatible({
-        "modelId": "anthropic.claude-3-sonnet-20240229-v1:0",
-        "inputModalities": ["TEXT", "IMAGE"],
-        "outputModalities": ["TEXT"],
-        "modelLifecycle": {"status": "ACTIVE"}
-    })
-    assert is_converse_compatible({
-        "modelId": "amazon.nova-pro-v1:0",
-        "inputModalities": ["TEXT"],
-        "outputModalities": ["TEXT"],
-        "modelLifecycle": {"status": "ACTIVE"}
-    })
-    # No provider filter - AI21 is compatible
-    assert is_converse_compatible({
-        "modelId": "ai21.jamba-1-5-mini-v1:0",
-        "inputModalities": ["TEXT"],
-        "outputModalities": ["TEXT"],
-        "modelLifecycle": {"status": "ACTIVE"}
-    })
-    # Incompatible: no text modalities
-    assert not is_converse_compatible({
-        "modelId": "stability.stable-diffusion-xl-v1:0",
-        "inputModalities": ["IMAGE"],
-        "outputModalities": ["IMAGE"],
-        "modelLifecycle": {"status": "ACTIVE"}
-    })
-    # Incompatible: deprecated
-    assert not is_converse_compatible({
-        "modelId": "anthropic.claude-3-sonnet-20240229-v1:0",
-        "inputModalities": ["TEXT"],
-        "outputModalities": ["TEXT"],
-        "modelLifecycle": {"status": "DEPRECATED"}
-    })
+from llm_bedrock import BedrockModel
 
 
 def test_bedrock_model_initialization():
     model = BedrockModel(
-        model_id="bedrock-ks/anthropic.claude-3-sonnet-20240229-v1:0",
-        bedrock_model_id="anthropic.claude-3-sonnet-20240229-v1:0",
+        model_id="bedrock-ks/us.anthropic.claude-3-sonnet-20240229-v1:0",
+        bedrock_model_id="us.anthropic.claude-3-sonnet-20240229-v1:0",
         region="us-east-1",
-        model_name="Claude 3 Sonnet",
-        provider="Anthropic",
+        model_name="US Claude 3 Sonnet",
         supports_streaming=True,
-        input_modalities=["TEXT", "IMAGE"],
+        input_modalities=["TEXT"],
         output_modalities=["TEXT"],
     )
 
-    assert model.model_id == "bedrock-ks/anthropic.claude-3-sonnet-20240229-v1:0"
-    assert model.bedrock_model_id == "anthropic.claude-3-sonnet-20240229-v1:0"
+    assert model.model_id == "bedrock-ks/us.anthropic.claude-3-sonnet-20240229-v1:0"
+    assert model.bedrock_model_id == "us.anthropic.claude-3-sonnet-20240229-v1:0"
     assert model.region == "us-east-1"
     assert model.can_stream is True
-    assert "image/jpeg" in model.attachment_types
-    assert "image/png" in model.attachment_types
 
 
 def test_document_format_mapping():
@@ -81,6 +40,70 @@ def test_content_blocks_text_only():
 
     content = model._content_blocks(MockPrompt("Hello world"))
     assert content == [{"text": "Hello world"}]
+
+
+def test_content_blocks_with_image():
+    model = BedrockModel(
+        model_id="bedrock-ks/test-model-v1:0",
+        bedrock_model_id="test-model-v1:0",
+    )
+
+    class MockAttachment:
+        def resolve_type(self):
+            return "image/png"
+        def content_bytes(self):
+            return b"\x89PNG\r\n\x1a\n"
+
+    class MockPrompt:
+        prompt = "What's in this image?"
+        attachments = [MockAttachment()]
+
+    content = model._content_blocks(MockPrompt())
+    assert len(content) == 2
+    assert content[0] == {"text": "What's in this image?"}
+    assert content[1] == {"image": {"format": "png", "source": {"bytes": b"\x89PNG\r\n\x1a\n"}}}
+
+
+def test_content_blocks_with_jpeg():
+    model = BedrockModel(
+        model_id="bedrock-ks/test-model-v1:0",
+        bedrock_model_id="test-model-v1:0",
+    )
+
+    class MockAttachment:
+        def resolve_type(self):
+            return "image/jpg"
+        def content_bytes(self):
+            return b"\xff\xd8\xff"
+
+    class MockPrompt:
+        prompt = "Describe this"
+        attachments = [MockAttachment()]
+
+    content = model._content_blocks(MockPrompt())
+    assert content[1]["image"]["format"] == "jpeg"
+
+
+def test_content_blocks_with_document():
+    model = BedrockModel(
+        model_id="bedrock-ks/test-model-v1:0",
+        bedrock_model_id="test-model-v1:0",
+    )
+
+    class MockAttachment:
+        def resolve_type(self):
+            return "application/pdf"
+        def content_bytes(self):
+            return b"%PDF-1.4"
+
+    class MockPrompt:
+        prompt = "Summarize this"
+        attachments = [MockAttachment()]
+
+    content = model._content_blocks(MockPrompt())
+    assert len(content) == 2
+    assert content[1]["document"]["format"] == "pdf"
+    assert content[1]["document"]["source"] == {"bytes": b"%PDF-1.4"}
 
 
 def test_build_request_with_tools():
